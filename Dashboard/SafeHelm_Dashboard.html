@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SafeHelm — Serial Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=JetBrains+Mono:wght@300;400;500;700&family=Exo+2:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+/* ════════════════════════════════════════════
+   ROOT & RESET
+════════════════════════════════════════════ */
+:root {
+  --bg:        #070a0f;
+  --bg2:       #0c1018;
+  --bg3:       #111722;
+  --border:    #1a2233;
+  --border-hi: #243045;
+
+  --amber:     #f59e0b;
+  --amber-dim: rgba(245,158,11,.15);
+  --amber-glow:rgba(245,158,11,.35);
+
+  --cyan:      #22d3ee;
+  --cyan-dim:  rgba(34,211,238,.12);
+  --cyan-glow: rgba(34,211,238,.3);
+
+  --safe:      #10b981;
+  --warn:      #f97316;
+  --danger:    #ef4444;
+  --muted:     #3d5068;
+  --text:      #cdd8e8;
+  --text-dim:  #7a8fa8;
+
+  --font-hud:  'Orbitron', monospace;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Exo 2', sans-serif;
+
+  --r: 10px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: 300;
+  overflow-x: hidden;
+}
+
+/* ════ SCAN LINE ════ */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg, transparent, transparent 3px,
+    rgba(0,0,0,.06) 3px, rgba(0,0,0,.06) 4px
+  );
+  pointer-events: none; z-index: 9000;
+}
+
+/* ════ AMBIENT GRID ════ */
+#grid-bg {
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(34,211,238,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(34,211,238,.03) 1px, transparent 1px);
+  background-size: 36px 36px;
+  pointer-events: none; z-index: 0;
+  animation: gridFade 10s ease-in-out infinite alternate;
+}
+@keyframes gridFade { from{opacity:.5} to{opacity:1} }
+
+/* ════════════════════════════════════════════
+   HEADER
+════════════════════════════════════════════ */
+header {
+  position: relative; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 28px;
+  background: rgba(7,10,15,.92);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.logo-group { display: flex; align-items: center; gap: 14px; }
+.logo-hex {
+  width: 44px; height: 44px;
+  background: linear-gradient(135deg, var(--amber), #b45309);
+  clip-path: polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 0 20px var(--amber-glow);
+  flex-shrink: 0;
+}
+.logo-label {
+  font-family: var(--font-hud);
+  font-size: 18px; font-weight: 900;
+  letter-spacing: 3px;
+  color: var(--text);
+}
+.logo-label span { color: var(--amber); }
+.logo-sub {
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 2px;
+  color: var(--muted); margin-top: 2px;
+}
+
+.header-controls {
+  display: flex; align-items: center; gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* Board mode toggle */
+.mode-toggle {
+  display: flex;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.mode-btn {
+  padding: 7px 14px;
+  cursor: pointer;
+  border: none; background: transparent;
+  color: var(--muted);
+  transition: all .2s;
+  text-transform: uppercase;
+}
+.mode-btn.active {
+  background: var(--amber-dim);
+  color: var(--amber);
+  border: none;
+}
+.mode-btn:hover:not(.active) { color: var(--text); }
+
+/* Connect button */
+.connect-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 18px;
+  background: var(--bg3);
+  border: 1px solid var(--border-hi);
+  border-radius: 7px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px; letter-spacing: 1.5px;
+  cursor: pointer;
+  transition: all .25s;
+  text-transform: uppercase;
+}
+.connect-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 14px var(--cyan-glow); }
+.connect-btn.connected { border-color: var(--safe); color: var(--safe); box-shadow: 0 0 10px rgba(16,185,129,.25); }
+.connect-btn.connected:hover { border-color: var(--danger); color: var(--danger); box-shadow: 0 0 14px rgba(239,68,68,.25); }
+
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--muted);
+  transition: background .3s;
+}
+.conn-dot.live { background: var(--safe); animation: blink 1.2s infinite; }
+.conn-dot.err  { background: var(--danger); }
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+.header-right {
+  display: flex; align-items: center; gap: 16px;
+}
+#clock {
+  font-family: var(--font-mono);
+  font-size: 13px; color: var(--muted);
+  letter-spacing: 1px;
+}
+#conn-status-label {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* ════════════════════════════════════════════
+   MAIN LAYOUT — BENTO GRID
+════════════════════════════════════════════ */
+main {
+  position: relative; z-index: 1;
+  padding: 22px 28px;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 320px;
+  grid-template-rows: auto auto auto;
+  gap: 16px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ════ CARD BASE ════ */
+.card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 22px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .3s, box-shadow .3s;
+}
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 10%, var(--cyan) 50%, transparent 90%);
+  opacity: .25;
+}
+
+.card-tag {
+  font-family: var(--font-mono);
+  font-size: 9px; font-weight: 500;
+  letter-spacing: 3px; text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 7px;
+}
+.card-tag::before {
+  content: ''; width: 2px; height: 12px;
+  background: var(--amber); border-radius: 2px; flex-shrink: 0;
+}
+
+.card-val {
+  font-family: var(--font-hud);
+  font-weight: 700;
+  line-height: 1;
+  transition: color .4s;
+}
+.card-unit {
+  font-family: var(--font-mono);
+  font-size: 13px; font-weight: 300;
+  color: var(--muted); margin-left: 6px;
+}
+.card-status {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-block;
+  transition: all .3s;
+}
+
+/* ════════════════════════════════════════════
+   BPM CARD
+════════════════════════════════════════════ */
+#card-bpm {
+  grid-column: 1; grid-row: 1;
+}
+#card-bpm .card-val { font-size: 72px; color: var(--safe); }
+
+.pulse-ring-wrap {
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+  width: 80px; height: 80px;
+  display: flex; align-items: center; justify-content: center;
+}
+.pulse-ring {
+  position: absolute;
+  width: 60px; height: 60px;
+  border: 2px solid var(--safe);
+  border-radius: 50%;
+  opacity: 0;
+}
+.pulse-ring:nth-child(1) { animation: pulseRing 2s ease-out infinite; }
+.pulse-ring:nth-child(2) { animation: pulseRing 2s ease-out .5s infinite; }
+.pulse-ring:nth-child(3) { animation: pulseRing 2s ease-out 1s infinite; }
+.pulse-core {
+  width: 22px; height: 22px;
+  background: var(--safe);
+  border-radius: 50%;
+  box-shadow: 0 0 14px var(--safe);
+  position: relative; z-index: 1;
+  animation: corebeat 1s ease-in-out infinite;
+}
+@keyframes pulseRing {
+  0%  { transform: scale(.4); opacity: .6; }
+  100%{ transform: scale(2.2); opacity: 0; }
+}
+@keyframes corebeat {
+  0%,100%{ transform: scale(1); }
+  50%    { transform: scale(1.3); }
+}
+
+#bpm-bar-wrap { margin-top: 14px; }
+.mini-bar-track {
+  height: 4px; background: rgba(255,255,255,.05);
+  border-radius: 3px; overflow: hidden; margin-top: 5px;
+}
+.mini-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: var(--safe);
+  transition: width .6s ease, background .4s;
+}
+
+/* ECG wave SVG */
+#ecg-svg {
+  width: 100%; height: 40px;
+  margin-top: 14px; opacity: .65;
+  overflow: visible;
+}
+#ecg-path {
+  fill: none;
+  stroke: var(--safe);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ════════════════════════════════════════════
+   SPO2 CARD
+════════════════════════════════════════════ */
+#card-spo2 {
+  grid-column: 2; grid-row: 1;
+}
+#card-spo2 .card-val { font-size: 72px; color: var(--safe); }
+
+.spo2-arc-wrap {
+  position: absolute; right: 16px; top: 16px;
+}
+#spo2-arc-svg { width: 90px; height: 90px; }
+
+.spo2-desc {
+  font-family: var(--font-mono);
+  font-size: 10px; color: var(--muted);
+  margin-top: 6px; line-height: 1.6;
+}
+
+/* ════════════════════════════════════════════
+   GAS CARD
+════════════════════════════════════════════ */
+#card-gas {
+  grid-column: 3; grid-row: 1;
+}
+#card-gas .card-val { font-size: 64px; }
+
+.gas-threshold-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9px; letter-spacing: 1px;
+  color: var(--muted);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 3px 8px; margin-top: 8px;
+}
+.gas-threshold-badge span { color: var(--amber); font-weight: 500; }
+
+.gas-bar-grid { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.gas-segment-label {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted); margin-bottom: 3px;
+}
+.gas-meter-track {
+  height: 8px; background: rgba(255,255,255,.04);
+  border-radius: 4px; overflow: hidden;
+  position: relative;
+}
+.gas-meter-fill {
+  height: 100%; border-radius: 4px;
+  transition: width .7s cubic-bezier(.4,0,.2,1), background .4s;
+  position: relative;
+}
+.gas-meter-fill::after {
+  content: '';
+  position: absolute; right: 0; top: 0; bottom: 0; width: 4px;
+  background: rgba(255,255,255,.4);
+  border-radius: 0 4px 4px 0;
+}
+/* Danger line marker */
+.gas-marker {
+  position: absolute; top: 0; bottom: 0; width: 2px;
+  background: var(--danger); opacity: .7;
+  z-index: 2;
+}
+.gas-marker::after {
+  content: attr(data-label);
+  position: absolute; top: -16px; left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono); font-size: 8px;
+  color: var(--danger); white-space: nowrap;
+}
+
+/* ════════════════════════════════════════════
+   TERMINAL — spans right column rows 1-3
+════════════════════════════════════════════ */
+#card-terminal {
+  grid-column: 4; grid-row: 1 / 4;
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 120px);
+}
+.terminal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.terminal-body {
+  flex: 1;
+  background: #04070c;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  overflow-y: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #5a7a6a;
+  line-height: 1.7;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.terminal-body::-webkit-scrollbar { width: 4px; }
+.terminal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.t-line { display: flex; gap: 8px; }
+.t-time { color: var(--muted); flex-shrink: 0; }
+.t-raw  { color: #4db880; }
+.t-raw.t-warn  { color: var(--warn); }
+.t-raw.t-crit  { color: var(--danger); }
+.t-raw.t-sys   { color: var(--cyan); }
+
+.terminal-stats {
+  margin-top: 10px;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.t-stat {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px; padding: 7px 10px;
+}
+.t-stat-label { font-family: var(--font-mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+.t-stat-val { font-family: var(--font-mono); font-size: 14px; color: var(--text); margin-top: 2px; }
+
+.btn-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px; padding: 4px 10px;
+  color: var(--muted); font-family: var(--font-mono); font-size: 10px;
+  cursor: pointer; letter-spacing: 1px;
+  transition: all .2s;
+}
+.btn-clear:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ════════════════════════════════════════════
+   SHOCK CARD
+════════════════════════════════════════════ */
+#card-shock {
+  grid-column: 1 / 3; grid-row: 2;
+}
+#card-shock .card-val { font-size: 56px; }
+
+.shock-history {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 50px; margin-top: 14px;
+}
+.shock-bar-item {
+  flex: 1; border-radius: 3px 3px 0 0;
+  background: var(--border-hi);
+  transition: height .4s ease, background .3s;
+  min-height: 4px;
+}
+
+.shock-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 8px; margin-top: 14px;
+}
+.shock-mini {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 12px;
+  font-family: var(--font-mono);
+}
+.shock-mini-label { font-size: 9px; color: var(--muted); letter-spacing: 1px; }
+.shock-mini-val   { font-size: 15px; font-weight: 500; margin-top: 3px; }
+
+/* ════════════════════════════════════════════
+   OVERVIEW / STATUS ROW
+════════════════════════════════════════════ */
+#card-status {
+  grid-column: 3; grid-row: 2;
+}
+
+.system-list { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+.sys-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; border-radius: 6px;
+  background: var(--bg3); border: 1px solid var(--border);
+  font-size: 12px;
+}
+.sys-item-left { display: flex; align-items: center; gap: 8px; }
+.sys-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-safe   { background: var(--safe); box-shadow: 0 0 6px var(--safe); }
+.dot-warn   { background: var(--warn); box-shadow: 0 0 6px var(--warn); animation: blink 1s infinite; }
+.dot-danger { background: var(--danger); box-shadow: 0 0 6px var(--danger); animation: blink .6s infinite; }
+.dot-off    { background: var(--muted); }
+.sys-val { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+
+/* ════════════════════════════════════════════
+   HISTORY CHART CARD
+════════════════════════════════════════════ */
+#card-chart {
+  grid-column: 1 / 4; grid-row: 3;
+}
+.chart-tabs {
+  display: flex; gap: 6px; margin-bottom: 14px;
+}
+.chart-tab {
+  padding: 5px 14px; border-radius: 5px;
+  background: transparent; border: 1px solid var(--border);
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted); cursor: pointer;
+  transition: all .2s;
+}
+.chart-tab.active {
+  background: var(--cyan-dim); border-color: var(--cyan); color: var(--cyan);
+}
+.chart-tab:hover:not(.active) { color: var(--text); border-color: var(--border-hi); }
+
+#main-chart-wrap { height: 140px; position: relative; }
+#mainChart { width: 100% !important; height: 100% !important; }
+
+/* ════════════════════════════════════════════
+   EMERGENCY OVERLAY
+════════════════════════════════════════════ */
+#emergency-overlay {
+  position: fixed; inset: 0;
+  z-index: 8000;
+  display: none;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(5,0,0,.93);
+  backdrop-filter: blur(6px);
+  animation: emergencyBG 1s ease-in-out infinite alternate;
+}
+#emergency-overlay.active { display: flex; }
+@keyframes emergencyBG {
+  from { background: rgba(5,0,0,.93); }
+  to   { background: rgba(30,0,0,.97); }
+}
+
+.emergency-inner {
+  text-align: center;
+  animation: emergencyShake .18s ease infinite;
+}
+@keyframes emergencyShake {
+  0%,100%{ transform: translateX(0); }
+  25%    { transform: translateX(-3px); }
+  75%    { transform: translateX(3px); }
+}
+
+.emergency-icon { font-size: 80px; animation: emergencyPulse .6s ease-in-out infinite alternate; }
+@keyframes emergencyPulse { from{transform:scale(.9)} to{transform:scale(1.1)} }
+
+.emergency-title {
+  font-family: var(--font-hud);
+  font-size: 56px; font-weight: 900;
+  color: var(--danger);
+  letter-spacing: 8px;
+  text-shadow: 0 0 40px var(--danger), 0 0 80px rgba(239,68,68,.4);
+  margin: 16px 0;
+}
+.emergency-reason {
+  font-family: var(--font-mono);
+  font-size: 18px; color: #fca5a5;
+  letter-spacing: 3px; margin-bottom: 10px;
+}
+.emergency-vals {
+  font-family: var(--font-mono);
+  font-size: 13px; color: rgba(255,255,255,.5);
+  margin-bottom: 32px; letter-spacing: 1px;
+}
+.emergency-dismiss {
+  padding: 12px 36px;
+  background: transparent; border: 2px solid var(--danger);
+  border-radius: 7px; color: var(--danger);
+  font-family: var(--font-hud); font-size: 14px; letter-spacing: 3px;
+  cursor: pointer; text-transform: uppercase;
+  transition: all .2s;
+}
+.emergency-dismiss:hover {
+  background: rgba(239,68,68,.12);
+  box-shadow: 0 0 20px rgba(239,68,68,.4);
+}
+
+/* strobe overlay bars */
+#emergency-overlay::before, #emergency-overlay::after {
+  content: '';
+  position: absolute; left: 0; right: 0; height: 6px;
+  background: var(--danger); opacity: .7;
+  animation: strobeBars 1s steps(1) infinite;
+}
+#emergency-overlay::before { top: 0; }
+#emergency-overlay::after  { bottom: 0; animation-delay: .5s; }
+@keyframes strobeBars { 0%,100%{opacity:.7} 50%{opacity:.1} }
+
+/* ════════════════════════════════════════════
+   MUTED / WAITING STATE
+════════════════════════════════════════════ */
+.val-muted { opacity: .25; }
+.waiting-text {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 1px; margin-top: 8px;
+}
+
+/* ════════════════════════════════════════════
+   UTIL
+════════════════════════════════════════════ */
+.color-safe   { color: var(--safe) !important; }
+.color-warn   { color: var(--warn) !important; }
+.color-danger { color: var(--danger) !important; }
+.color-muted  { color: var(--muted) !important; }
+.color-amber  { color: var(--amber) !important; }
+
+.status-safe   { background: rgba(16,185,129,.12); color: var(--safe); border: 1px solid rgba(16,185,129,.25); }
+.status-warn   { background: rgba(249,115,22,.12);  color: var(--warn); border: 1px solid rgba(249,115,22,.25); }
+.status-danger { background: rgba(239,68,68,.12);   color: var(--danger); border: 1px solid rgba(239,68,68,.25); animation: blink .7s infinite; }
+.status-off    { background: rgba(61,80,104,.1); color: var(--muted); border: 1px solid var(--border); }
+
+@media (max-width: 1100px) {
+  main {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto;
+  }
+  #card-terminal { grid-column: 1 / -1; grid-row: auto; max-height: 300px; }
+  #card-shock    { grid-column: 1 / -1; }
+  #card-chart    { grid-column: 1 / -1; }
+}
+</style>
+</head>
+<body>
+<div id="grid-bg"></div>
+
+<!-- ══════════ EMERGENCY OVERLAY ══════════ -->
+<div id="emergency-overlay">
+  <div class="emergency-inner">
+    <div class="emergency-icon">🚨</div>
+    <div class="emergency-title">EMERGENCY</div>
+    <div class="emergency-reason" id="emg-reason">CRITICAL HAZARD DETECTED</div>
+    <div class="emergency-vals" id="emg-vals"></div>
+    <button class="emergency-dismiss" onclick="dismissEmergency()">ACKNOWLEDGE &amp; DISMISS</button>
+  </div>
+</div>
+
+<!-- ══════════ HEADER ══════════ -->
+<header>
+  <div class="logo-group">
+    <div class="logo-hex">⛑</div>
+    <div>
+      <div class="logo-label">SAFE<span>HELM</span></div>
+      <div class="logo-sub">SERIAL COMMAND CENTER · IoT WORKER SAFETY</div>
+    </div>
+  </div>
+
+  <div class="header-controls">
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="btn-esp32" onclick="setMode('esp32')">ESP32</button>
+      <button class="mode-btn" id="btn-uno"   onclick="setMode('uno')">Arduino UNO</button>
+    </div>
+
+    <button class="connect-btn" id="connect-btn" onclick="connectWiFi()">
+      <div class="conn-dot" id="conn-dot"></div>
+      <span id="connect-label">Connect WiFi</span>
+    </button>
+  </div>
+
+  <div class="header-right">
+    <div id="conn-status-label">DISCONNECTED</div>
+    <div id="clock">--:--:--</div>
+  </div>
+</header>
+
+<!-- ══════════ MAIN BENTO GRID ══════════ -->
+<main>
+
+  <!-- BPM CARD -->
+  <div class="card" id="card-bpm">
+    <div class="card-tag">Heart Rate</div>
+    <div class="card-val val-muted" id="bpm-val">---<span class="card-unit">BPM</span></div>
+    <div class="card-status status-off" id="bpm-status">AWAITING DATA</div>
+    <div id="bpm-bar-wrap">
+      <div style="display:flex;justify-content:space-between;margin-top:10px">
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">50</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">RANGE</span>
+        <span style="font-family:var(--font-mono);font-size:9px;color:var(--muted)">130</span>
+      </div>
+      <div class="mini-bar-track">
+        <div class="mini-bar-fill" id="bpm-bar" style="width:0%"></div>
+      </div>
+    </div>
+    <!-- ECG SVG -->
+    <svg id="ecg-svg" viewBox="0 0 300 40">
+      <path id="ecg-path" d="M0,20 L300,20"/>
+    </svg>
+    <div class="pulse-ring-wrap" id="pulse-anim">
+      <div class="pulse-ring"></div>
+      <div class="pulse-ring"></div>
+      <div class="pulse-ring"></div>
+      <div class="pulse-core" id="pulse-core"></div>
+    </div>
+  </div>
+
+  <!-- SPO2 CARD -->
+  <div class="card" id="card-spo2">
+    <div class="card-tag">Blood Oxygen — SpO₂</div>
+    <div class="card-val val-muted" id="spo2-val">--<span class="card-unit">%</span></div>
+    <div class="card-status status-off" id="spo2-status">AWAITING DATA</div>
+    <div class="spo2-desc" id="spo2-desc">—</div>
+    <div class="spo2-arc-wrap">
+      <svg id="spo2-arc-svg" viewBox="0 0 90 90">
+        <circle cx="45" cy="45" r="36" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="7"/>
+        <circle cx="45" cy="45" r="36" fill="none"
+          id="spo2-arc"
+          stroke="var(--safe)" stroke-width="7"
+          stroke-linecap="round"
+          stroke-dasharray="226" stroke-dashoffset="226"
+          transform="rotate(-90 45 45)"
+          style="transition: stroke-dashoffset .7s ease, stroke .4s"/>
+        <text x="45" y="50" text-anchor="middle"
+          font-family="'Orbitron',monospace" font-size="14" font-weight="700"
+          fill="var(--safe)" id="spo2-arc-text">--</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- GAS CARD -->
+  <div class="card" id="card-gas">
+    <div class="card-tag">MQ-2 Gas Sensor</div>
+    <div class="card-val val-muted" id="gas-val">----<span class="card-unit" id="gas-unit">ADC</span></div>
+    <div class="card-status status-off" id="gas-status">AWAITING DATA</div>
+    <div class="gas-threshold-badge">
+      ALERT THRESHOLD: <span id="gas-threshold-label">420</span> ADC
+    </div>
+    <div class="gas-bar-grid" style="margin-top:16px">
+      <div>
+        <div class="gas-segment-label">
+          <span>CONCENTRATION LEVEL</span>
+          <span id="gas-pct">0%</span>
+        </div>
+        <div class="gas-meter-track" id="gas-track">
+          <div class="gas-meter-fill" id="gas-fill" style="width:0%;background:var(--safe)"></div>
+          <div class="gas-marker" id="gas-marker" style="left:41%" data-label="LIMIT"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TERMINAL (right, full height) -->
+  <div class="card" id="card-terminal">
+    <div class="terminal-head">
+      <div class="card-tag" style="margin-bottom:0">Serial Feed</div>
+      <button class="btn-clear" onclick="clearTerminal()">CLEAR</button>
+    </div>
+    <div class="terminal-body" id="terminal-body">
+      <div class="t-line"><span class="t-raw t-sys">[SYSTEM] SafeHelm Serial Command Center ready.</span></div>
+      <div class="t-line"><span class="t-raw t-sys">[SYSTEM] Click "Connect Device" to begin.</span></div>
+      <div class="t-line"><span class="t-raw t-sys">[SYSTEM] Expected format: GAS:v,BPM:v,SPO2:v,SHOCK:v</span></div>
+    </div>
+    <div class="terminal-stats">
+      <div class="t-stat">
+        <div class="t-stat-label">PACKETS RX</div>
+        <div class="t-stat-val" id="t-packets">0</div>
+      </div>
+      <div class="t-stat">
+        <div class="t-stat-label">PARSE ERRORS</div>
+        <div class="t-stat-val" id="t-errors" style="color:var(--muted)">0</div>
+      </div>
+      <div class="t-stat">
+        <div class="t-stat-label">LAST RX</div>
+        <div class="t-stat-val" id="t-last">—</div>
+      </div>
+      <div class="t-stat">
+        <div class="t-stat-label">BAUD RATE</div>
+        <div class="t-stat-val">115200</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SHOCK CARD -->
+  <div class="card" id="card-shock">
+    <div class="card-tag">Shock / Impact — MPU-6050</div>
+    <div style="display:flex;align-items:flex-end;gap:20px">
+      <div>
+        <div class="card-val val-muted" id="shock-val">------<span class="card-unit">units</span></div>
+        <div class="card-status status-off" id="shock-status">AWAITING DATA</div>
+      </div>
+      <div style="flex:1">
+        <div class="shock-history" id="shock-history">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+    <div class="shock-grid">
+      <div class="shock-mini">
+        <div class="shock-mini-label">FALL THRESHOLD</div>
+        <div class="shock-mini-val color-warn">8,000</div>
+      </div>
+      <div class="shock-mini">
+        <div class="shock-mini-label">PEAK THIS SESSION</div>
+        <div class="shock-mini-val" id="shock-peak">—</div>
+      </div>
+      <div class="shock-mini">
+        <div class="shock-mini-label">FALL EVENTS</div>
+        <div class="shock-mini-val" id="shock-events">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SYSTEM STATUS CARD -->
+  <div class="card" id="card-status">
+    <div class="card-tag">System Diagnostics</div>
+    <div class="system-list">
+      <div class="sys-item">
+        <div class="sys-item-left"><div class="sys-dot dot-off" id="dot-serial"></div><span>Serial Port</span></div>
+        <div class="sys-val" id="sys-serial">CLOSED</div>
+      </div>
+      <div class="sys-item">
+        <div class="sys-item-left"><div class="sys-dot dot-off" id="dot-stream"></div><span>Data Stream</span></div>
+        <div class="sys-val" id="sys-stream">IDLE</div>
+      </div>
+      <div class="sys-item">
+        <div class="sys-item-left"><div class="sys-dot dot-off" id="dot-bpm"></div><span>BPM Sensor</span></div>
+        <div class="sys-val" id="sys-bpm">—</div>
+      </div>
+      <div class="sys-item">
+        <div class="sys-item-left"><div class="sys-dot dot-off" id="dot-gas-s"></div><span>Gas Sensor</span></div>
+        <div class="sys-val" id="sys-gas">—</div>
+      </div>
+      <div class="sys-item">
+        <div class="sys-item-left"><div class="sys-dot dot-off" id="dot-mpu"></div><span>MPU-6050 IMU</span></div>
+        <div class="sys-val" id="sys-mpu">—</div>
+      </div>
+      <div class="sys-item">
+        <div class="sys-item-left"><div class="sys-dot dot-off" id="dot-spo2s"></div><span>MAX30105 SpO₂</span></div>
+        <div class="sys-val" id="sys-spo2">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY CHART -->
+  <div class="card" id="card-chart">
+    <div class="card-tag">Sensor History — Last 60 readings</div>
+    <div class="chart-tabs">
+      <button class="chart-tab active" onclick="setChart('bpm',this)">BPM</button>
+      <button class="chart-tab" onclick="setChart('spo2',this)">SPO₂</button>
+      <button class="chart-tab" onclick="setChart('gas',this)">GAS</button>
+      <button class="chart-tab" onclick="setChart('shock',this)">SHOCK</button>
+    </div>
+    <div id="main-chart-wrap">
+      <canvas id="mainChart"></canvas>
+    </div>
+  </div>
+
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════ */
+const state = {
+  connected: false,
+  mode: 'esp32',           // 'esp32' | 'uno'
+  port: null,
+  reader: null,
+  reading: false,
+  packets: 0,
+  errors: 0,
+  fallEvents: 0,
+  shockPeak: 0,
+  emergencyActive: false,
+  emergencyMuted: false,
+
+  // latest values
+  bpm: null, spo2: null, gas: null, shock: null,
+
+  // history buffers (last 60)
+  hist: { bpm:[], spo2:[], gas:[], shock:[] },
+};
+
+const THRESHOLDS = {
+  esp32: { gas: 3000, maxGas: 4095 },
+  bpmHi: 130,
+  bpmLo: 50,
+  spo2Lo: 90,
+  shockFall: 200
+};
+
+/* ═══════════════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════════════ */
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN',{hour12:false});
+}, 500);
+
+/* ═══════════════════════════════════════════════════════
+   MODE TOGGLE
+═══════════════════════════════════════════════════════ */
+function setMode(mode) {
+  state.mode = mode;
+  document.getElementById('btn-esp32').classList.toggle('active', mode === 'esp32');
+  document.getElementById('btn-uno'  ).classList.toggle('active', mode === 'uno');
+  const thr = mode === 'esp32' ? 3000 : 120;
+  document.getElementById('gas-threshold-label').textContent = thr;
+  // update marker position: thr/1023
+  const pct = (thr / 4095 * 100).toFixed(1);
+  document.getElementById('gas-marker').style.left = pct + '%';
+  logTerminal(`[SYSTEM] Switched to ${mode.toUpperCase()} mode. Gas threshold: ${thr} ADC`, 'sys');
+  if(state.gas !== null) updateGasUI(state.gas);
+}
+
+function connectWiFi(){
+
+  logTerminal("[SYSTEM] Connecting via WiFi...", "sys");
+
+  if(wifiInterval) clearInterval(wifiInterval);
+
+  wifiInterval = setInterval(async () => {
+    try {
+
+      const response = await fetch("http://10.241.146.187", { cache: "no-store" });
+
+      // 🔥 IMPORTANT FIX
+      if(!response.ok){
+        throw new Error("HTTP error");
+      }
+
+      const data = await response.json();
+
+      // convert to your format
+      const line = `GAS:${data.gas},BPM:${data.bpm},SPO2:${data.spo2},SHOCK:${data.shock}`;
+
+      parseLine(line);
+
+      logTerminal("[OK] Data received", "ok");
+
+    } catch (e) {
+      logTerminal("[ERROR] WiFi connection failed", "crit");
+      console.log(e);
+    }
+
+  }, 1000);
+}
+
+async function connectSerial() {
+  if (!('serial' in navigator)) {
+    alert('Web Serial API is not supported in this browser.\nPlease use Chrome or Edge (desktop).');
+    return;
+  }
+  try {
+    state.port = await navigator.serial.requestPort();
+    await state.port.open({ baudRate: 115200 });
+    setConnected(true);
+    logTerminal('[SYSTEM] Port opened at 115200 baud.', 'sys');
+    startReading();
+  } catch(e) {
+    logTerminal(`[ERROR] ${e.message}`, 'crit');
+    setConnected(false);
+  }
+}
+
+async function disconnectSerial() {
+  state.reading = false;
+  try {
+    if(state.reader) { await state.reader.cancel(); state.reader = null; }
+    if(state.port)   { await state.port.close();    state.port   = null; }
+  } catch(e) { /* ignore */ }
+  setConnected(false);
+  logTerminal('[SYSTEM] Port closed.', 'sys');
+}
+
+function setConnected(c) {
+  state.connected = c;
+  const btn   = document.getElementById('connect-btn');
+  const dot   = document.getElementById('conn-dot');
+  const label = document.getElementById('connect-label');
+  const sl    = document.getElementById('conn-status-label');
+
+  btn.className = 'connect-btn' + (c ? ' connected' : '');
+  dot.className = 'conn-dot' + (c ? ' live' : '');
+  label.textContent = c ? 'Disconnect' : 'Connect Device';
+  sl.textContent    = c ? 'LIVE' : 'DISCONNECTED';
+  sl.style.color    = c ? 'var(--safe)' : 'var(--muted)';
+
+  setDot('dot-serial', c ? 'safe' : 'off');
+  document.getElementById('sys-serial').textContent = c ? 'OPEN' : 'CLOSED';
+  if(!c) {
+    setDot('dot-stream','off');
+    document.getElementById('sys-stream').textContent = 'IDLE';
+  }
+}
+
+/* ─── READING LOOP with TextDecoderStream ─── */
+async function startReading() {
+  state.reading = true;
+  const textDecoder = new TextDecoderStream();
+  state.port.readable.pipeTo(textDecoder.writable);
+  const reader = textDecoder.readable.getReader();
+  state.reader = reader;
+
+  setDot('dot-stream', 'safe');
+  document.getElementById('sys-stream').textContent = 'RECEIVING';
+
+  let buffer = '';
+
+  try {
+    while (state.reading) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      // Append to buffer, split on newlines
+      buffer += value;
+      const lines = buffer.split('\n');
+      // Last element may be partial — keep it in buffer
+      buffer = lines.pop();
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.length > 0) {
+          parseLine(trimmed);
+        }
+      }
+    }
+  } catch(e) {
+    if(state.reading) {
+      logTerminal(`[ERROR] Stream error: ${e.message}`, 'crit');
+    }
+  } finally {
+    state.reading = false;
+    if(state.connected) setConnected(false);
+  }
+}
+
+/* ─── PARSER ─── */
+function parseLine(raw) {
+  // Expected: GAS:v,BPM:v,SPO2:v,SHOCK:v
+  const classStr = isAlertLine(raw) ? 'crit' : isWarnLine(raw) ? 'warn' : '';
+  logTerminal(raw, classStr);
+
+  const map = {};
+  const parts = raw.split(',');
+  let valid = 0;
+  for(const p of parts) {
+    const [k, v] = p.split(':');
+    if(k && v !== undefined) {
+      const n = parseFloat(v);
+      if(!isNaN(n)) { map[k.trim().toUpperCase()] = n; valid++; }
+    }
+  }
+
+  if(valid < 4) {
+    state.errors++;
+    document.getElementById('t-errors').textContent = state.errors;
+    document.getElementById('t-errors').style.color = 'var(--warn)';
+    return;
+  }
+
+  state.packets++;
+  document.getElementById('t-packets').textContent = state.packets;
+  document.getElementById('t-last').textContent = new Date().toLocaleTimeString('en-IN',{hour12:false});
+
+  state.gas   = map['GAS']   ?? null;
+  state.bpm   = map['BPM']   ?? null;
+  state.spo2  = map['SPO2']  ?? null;
+  state.shock = map['SHOCK'] ?? null;
+
+  // Push to history
+  pushHist('bpm',   state.bpm);
+  pushHist('spo2',  state.spo2);
+  pushHist('gas',   state.gas);
+  pushHist('shock', state.shock);
+
+  updateAllUI();
+  checkAlerts();
+  updateChart();
+  updateDiagnostics();
+}
+
+function isAlertLine(raw) {
+  const map = quickParse(raw);
+  if(!map) return false;
+  const thr = THRESHOLDS[state.mode].gas;
+  return (map.BPM > 130) || (map.SPO2 > 0 && map.SPO2 < 90) ||
+       (map.GAS > thr) || (map.SHOCK > THRESHOLDS.shockFall);
+}
+function isWarnLine(raw) {
+  const map = quickParse(raw);
+  if(!map) return false;
+  const thr = THRESHOLDS[state.mode].gas;
+  return (map.BPM < 50 && map.BPM > 0) || (map.GAS > thr * 0.7);
+}
+function quickParse(raw) {
+  const m = {};
+  for(const p of raw.split(',')) { const [k,v] = p.split(':'); if(k&&v) m[k.trim().toUpperCase()] = parseInt(v); }
+  return m;
+}
+
+function pushHist(key, val) {
+  if(val === null || val === undefined) return;
+  state.hist[key].push(val);
+  if(state.hist[key].length > 60) state.hist[key].shift();
+}
+
+/* ═══════════════════════════════════════════════════════
+   UI UPDATE
+═══════════════════════════════════════════════════════ */
+function updateAllUI() {
+  updateBpmUI(state.bpm);
+  updateSpo2UI(state.spo2);
+  updateGasUI(state.gas);
+  updateShockUI(state.shock);
+}
+
+/* ── BPM ── */
+function updateBpmUI(v) {
+  if(v === null) return;
+  const el = document.getElementById('bpm-val');
+  el.innerHTML = `${v}<span class="card-unit">BPM</span>`;
+  el.classList.remove('val-muted');
+
+  let cls = 'safe', statusTxt = 'NORMAL', barCls = 'var(--safe)';
+  if(v > 130 || (v < 50 && v > 0)) {
+    cls = 'danger'; statusTxt = v > 130 ? 'TACHYCARDIA' : 'BRADYCARDIA';
+    barCls = 'var(--danger)';
+  } else if(v > 100) {
+    cls = 'warn'; statusTxt = 'ELEVATED'; barCls = 'var(--warn)';
+  } else if(v === 0) {
+    cls = 'off'; statusTxt = 'NO CONTACT';
+  }
+
+  el.className = `card-val color-${cls}`;
+  const stEl = document.getElementById('bpm-status');
+  stEl.textContent = statusTxt;
+  stEl.className = `card-status status-${cls === 'off' ? 'off' : cls}`;
+
+  // bar: 0–160 range, safe zone 50–130
+  const pct = Math.min((v / 160) * 100, 100);
+  const barEl = document.getElementById('bpm-bar');
+  barEl.style.width = pct + '%';
+  barEl.style.background = barCls;
+
+  // Pulse ring color
+  const core = document.getElementById('pulse-core');
+  core.style.background = barCls;
+  core.style.boxShadow  = `0 0 14px ${barCls}`;
+  document.querySelectorAll('.pulse-ring').forEach(r => r.style.borderColor = barCls);
+
+  // ECG wave update
+  updateECG(v);
+}
+
+// Simple ECG-like path generator
+const ecgPoints = new Array(60).fill(20);
+function updateECG(bpm) {
+  const speed = bpm > 0 ? Math.max(1, Math.round(bpm / 30)) : 0;
+  for(let i = 0; i < speed; i++) {
+    ecgPoints.shift();
+    // Simulate QRS-like waveform with random spikes
+    const beat = Math.random() < (bpm / 300);
+    if(beat) {
+      ecgPoints.push(5);
+      ecgPoints.shift(); ecgPoints.push(2);
+      ecgPoints.shift(); ecgPoints.push(38);
+      ecgPoints.shift(); ecgPoints.push(8);
+      ecgPoints.shift(); ecgPoints.push(20);
+    } else {
+      ecgPoints.push(20 + (Math.random()-0.5)*3);
+    }
+  }
+  const w = 300, step = w / (ecgPoints.length - 1);
+  const d = ecgPoints.map((y,i) => `${i === 0 ? 'M' : 'L'}${(i*step).toFixed(1)},${y.toFixed(1)}`).join(' ');
+  document.getElementById('ecg-path').setAttribute('d', d);
+}
+
+/* ── SPO2 ── */
+function updateSpo2UI(v) {
+  if(v === null) return;
+  const el   = document.getElementById('spo2-val');
+  const arc  = document.getElementById('spo2-arc');
+  const aText= document.getElementById('spo2-arc-text');
+  const desc = document.getElementById('spo2-desc');
+  const stEl = document.getElementById('spo2-status');
+
+  el.classList.remove('val-muted');
+  el.innerHTML = `${v}<span class="card-unit">%</span>`;
+
+  let color, cls, txt, descTxt;
+  if(v === 0)       { color='var(--muted)'; cls='off';    txt='NO CONTACT';    descTxt='Sensor not detecting.'; }
+  else if(v >= 95)  { color='var(--safe)';  cls='safe';   txt='NORMAL';        descTxt='Oxygen saturation normal. No intervention required.'; }
+  else if(v >= 90)  { color='var(--warn)';  cls='warn';   txt='LOW';           descTxt='Borderline SpO₂. Monitor closely. Consider rest.'; }
+  else              { color='var(--danger)';cls='danger';  txt='CRITICAL';      descTxt='Severe hypoxemia! Immediate medical attention needed.'; }
+
+  el.className = `card-val color-${cls}`;
+  stEl.textContent = txt; stEl.className = `card-status status-${cls}`;
+  desc.textContent = descTxt;
+
+  // Arc animation: 0–100% → dashoffset 226–0
+  const circumference = 226;
+  const offset = circumference - (v / 100) * circumference;
+  arc.style.strokeDashoffset = offset;
+  arc.style.stroke = color;
+  aText.setAttribute('fill', color);
+  aText.textContent = v > 0 ? v : '--';
+}
+
+/* ── GAS ── */
+function updateGasUI(v) {
+  if(v === null) return;
+  const thr    = THRESHOLDS[state.mode].gas;
+  const maxADC = 4095;
+
+  const el   = document.getElementById('gas-val');
+  const stEl = document.getElementById('gas-status');
+  const fill = document.getElementById('gas-fill');
+  const pctEl= document.getElementById('gas-pct');
+
+  el.classList.remove('val-muted');
+  el.innerHTML = `${v}<span class="card-unit" id="gas-unit">ADC</span>`;
+
+  const pct = Math.min((v / maxADC) * 100, 100);
+  pctEl.textContent = pct.toFixed(1) + '%';
+  fill.style.width = pct + '%';
+
+  let cls, txt, fillColor;
+  if(v >= thr)             { cls='danger'; txt='HAZARDOUS GAS DETECTED'; fillColor='var(--danger)'; }
+  else if(v >= thr * 0.7)  { cls='warn';   txt='ELEVATED LEVELS';        fillColor='var(--warn)'; }
+  else                     { cls='safe';   txt='CLEAR';                   fillColor='var(--safe)'; }
+
+  el.className = `card-val color-${cls}`;
+  stEl.textContent = txt; stEl.className = `card-status status-${cls}`;
+  fill.style.background = fillColor;
+
+  // Move marker
+  const markerPct = (thr / maxADC * 100).toFixed(1);
+  document.getElementById('gas-marker').style.left = markerPct + '%';
+}
+
+/* ── SHOCK ── */
+const SHOCK_HIST_BARS = 30;
+const shockHistory = new Array(SHOCK_HIST_BARS).fill(0);
+
+function updateShockUI(v) {
+  if(v === null) return;
+  const el   = document.getElementById('shock-val');
+  const stEl = document.getElementById('shock-status');
+
+  el.classList.remove('val-muted');
+  el.innerHTML = `${v.toLocaleString()}<span class="card-unit">units</span>`;
+
+  // Peak
+  if(v > state.shockPeak) {
+    state.shockPeak = v;
+    document.getElementById('shock-peak').textContent = v.toLocaleString();
+  }
+
+let cls, txt;
+
+if(v > 200){
+  cls='danger';
+  txt='FALL / TILT DETECTED';
+}
+else if(v > 100){
+  cls='warn';
+  txt='MOVEMENT';
+}
+else{
+  cls='safe';
+  txt='STABLE';
+}   
+
+  el.className = `card-val color-${cls}`;
+  stEl.textContent = txt; stEl.className = `card-status status-${cls}`;
+
+  // Update history bars
+  shockHistory.shift();
+  shockHistory.push(v);
+  const maxV = Math.max(...shockHistory, 10000);
+  const container = document.getElementById('shock-history');
+  container.innerHTML = shockHistory.map(sv => {
+    const h = Math.max(4, (sv / maxV) * 50);
+    let c;
+  if(sv > 200) c = 'var(--danger)';
+  else if(sv > 100) c = 'var(--warn)';
+  else c = 'var(--border-hi)';
+
+return `<div class="shock-bar-item" style="height:${h}px;background:${c}"></div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════
+   ALERTS / EMERGENCY
+═══════════════════════════════════════════════════════ */
+function checkAlerts() {
+  const { bpm, spo2, gas, shock, tilt } = state;
+  const thr = THRESHOLDS[state.mode].gas;
+  const reasons = [];
+
+  if(shock > THRESHOLDS.shockFall)
+    reasons.push(`FALL / TILT DETECTED — Shock: ${shock}`);
+
+  if(gas > thr)
+    reasons.push(`HAZARDOUS GAS — MQ2: ${gas}`);
+
+  if(bpm > 130)
+    reasons.push(`TACHYCARDIA — BPM: ${bpm}`);
+
+  if(bpm > 0 && bpm < 50)
+    reasons.push(`BRADYCARDIA — BPM: ${bpm}`);
+
+  if(spo2 > 0 && spo2 < 90)
+    reasons.push(`HYPOXEMIA — SpO₂: ${spo2}%`);
+
+  if(reasons.length > 0 && !state.emergencyMuted) {
+    triggerEmergency(reasons);
+  }
+}
+
+function triggerEmergency(reasons) {
+  if(state.emergencyActive) return;
+  state.emergencyActive = true;
+  state.emergencyMuted  = true;  // Suppress re-triggers until dismissed
+
+  document.getElementById('emg-reason').textContent = reasons[0];
+  document.getElementById('emg-vals').textContent =
+    `GAS: ${state.gas ?? '—'}  BPM: ${state.bpm ?? '—'}  SpO₂: ${state.spo2 ?? '—'}%  SHOCK: ${(state.shock ?? 0).toLocaleString()}`;
+  document.getElementById('emergency-overlay').classList.add('active');
+}
+
+function dismissEmergency() {
+  state.emergencyActive = false;
+  document.getElementById('emergency-overlay').classList.remove('active');
+  logTerminal('[SYSTEM] Emergency acknowledged by operator.', 'sys');
+  // Keep muted for 10 seconds to avoid immediate re-trigger
+  setTimeout(() => { state.emergencyMuted = false; }, 10000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   DIAGNOSTICS DOTS
+═══════════════════════════════════════════════════════ */
+function setDot(id, status) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.className = `sys-dot dot-${status}`;
+}
+
+function updateDiagnostics() {
+  const { bpm, spo2, gas, shock } = state;
+  const thr = THRESHOLDS[state.mode].gas;
+
+  // BPM
+  if(bpm === 0) { setDot('dot-bpm','warn'); document.getElementById('sys-bpm').textContent = 'NO CONTACT'; }
+  else if(bpm > 130 || bpm < 50) { setDot('dot-bpm','danger'); document.getElementById('sys-bpm').textContent = `${bpm} BPM ⚠`; }
+  else { setDot('dot-bpm','safe'); document.getElementById('sys-bpm').textContent = `${bpm} BPM`; }
+
+  // Gas
+  if(gas > thr) { setDot('dot-gas-s','danger'); document.getElementById('sys-gas').textContent = `${gas} ALERT`; }
+  else if(gas > thr * 0.7) { setDot('dot-gas-s','warn'); document.getElementById('sys-gas').textContent = `${gas} WARN`; }
+  else { setDot('dot-gas-s','safe'); document.getElementById('sys-gas').textContent = `${gas} ADC`; }
+
+  // MPU
+  if(shock > 200) { setDot('dot-mpu','danger'); document.getElementById('sys-mpu').textContent = `${shock.toLocaleString()} FALL`; }
+  else { setDot('dot-mpu','safe'); document.getElementById('sys-mpu').textContent = shock.toLocaleString(); }
+
+  // SpO2
+  if(spo2 === 0) { setDot('dot-spo2s','warn'); document.getElementById('sys-spo2').textContent = 'NO CONTACT'; }
+  else if(spo2 < 90) { setDot('dot-spo2s','danger'); document.getElementById('sys-spo2').textContent = `${spo2}% CRIT`; }
+  else { setDot('dot-spo2s','safe'); document.getElementById('sys-spo2').textContent = `${spo2}%`; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   TERMINAL
+═══════════════════════════════════════════════════════ */
+const MAX_TERMINAL_LINES = 200;
+let termLineCount = 0;
+
+function logTerminal(msg, type = '') {
+  const body = document.getElementById('terminal-body');
+  const now  = new Date().toLocaleTimeString('en-IN',{hour12:false});
+  const div  = document.createElement('div');
+  div.className = 't-line';
+  div.innerHTML = `<span class="t-time">${now}</span><span class="t-raw t-${type}">${escapeHtml(msg)}</span>`;
+  body.appendChild(div);
+  termLineCount++;
+  if(termLineCount > MAX_TERMINAL_LINES) {
+    body.removeChild(body.firstChild);
+    termLineCount--;
+  }
+  body.scrollTop = body.scrollHeight;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function clearTerminal() {
+  document.getElementById('terminal-body').innerHTML = '';
+  termLineCount = 0;
+  logTerminal('[SYSTEM] Terminal cleared.', 'sys');
+}
+
+/* ═══════════════════════════════════════════════════════
+   CHART.JS
+═══════════════════════════════════════════════════════ */
+let currentChartKey = 'bpm';
+let mainChart;
+
+const CHART_COLORS = {
+  bpm:   '#22d3ee',
+  spo2:  '#10b981',
+  gas:   '#f59e0b',
+  shock: '#ef4444',
+};
+const CHART_LABELS = {
+  bpm:   'Heart Rate (BPM)',
+  spo2:  'Blood Oxygen (%)',
+  gas:   'Gas Level (ADC)',
+  shock: 'Shock Units',
+};
+
+function initChart() {
+  const ctx = document.getElementById('mainChart').getContext('2d');
+  mainChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Array.from({length:60}, (_,i) => i % 10 === 0 ? `-${60-i}` : ''),
+      datasets: [{
+        label: 'BPM',
+        data: new Array(60).fill(null),
+        borderColor: CHART_COLORS.bpm,
+        backgroundColor: 'rgba(34,211,238,.06)',
+        borderWidth: 1.5,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(12,16,24,.95)',
+          borderColor: 'rgba(34,211,238,.25)', borderWidth: 1,
+          titleColor: '#7a8fa8', bodyColor: '#cdd8e8',
+          titleFont: { family: "'JetBrains Mono'" },
+          bodyFont:  { family: "'JetBrains Mono'" },
+        }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#3d5068', font:{size:9,family:"'JetBrains Mono'"} } },
+        y: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#3d5068', font:{size:9,family:"'JetBrains Mono'"} } }
+      }
+    }
+  });
+}
+
+function setChart(key, tabEl) {
+  currentChartKey = key;
+  document.querySelectorAll('.chart-tab').forEach(t => t.classList.remove('active'));
+  tabEl.classList.add('active');
+  updateChart();
+}
+
+function updateChart() {
+  if(!mainChart) return;
+  const data   = state.hist[currentChartKey];
+  const color  = CHART_COLORS[currentChartKey];
+  const label  = CHART_LABELS[currentChartKey];
+  const padded = new Array(Math.max(0, 60 - data.length)).fill(null).concat(data);
+
+  mainChart.data.datasets[0].data         = padded;
+  mainChart.data.datasets[0].borderColor  = color;
+  mainChart.data.datasets[0].backgroundColor = color.replace(')', ',.06)').replace('rgb','rgba').replace('#','rgba(').replace(/^rgba\(#/, 'rgba(') + (color.startsWith('#') ? ',0.06)' : '');
+  mainChart.data.datasets[0].label = label;
+  mainChart.update('none');
+}
+
+/* ═══════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════ */
+// Init shock history bars
+document.getElementById('shock-history').innerHTML =
+  new Array(SHOCK_HIST_BARS).fill('<div class="shock-bar-item" style="height:4px"></div>').join('');
+
+/* ===== WIFI CONNECTION ===== */
+
+const ESP32_IP = "http://10.241.146.187"; // 🔴 CHANGE THIS
+
+let wifiInterval = null;
+
+initChart();
+setMode('esp32');
+
+// Update clock immediately
+document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN',{hour12:false});
+</script>
+</body>
+</html>
